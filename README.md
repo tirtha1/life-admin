@@ -10,23 +10,27 @@ Life Admin automatically detects bills and bank transactions from your inbox, ex
 
 ### Dashboard
 <!-- Add screenshot: main dashboard showing bill summary cards -->
-![Dashboard](docs/screenshots/dashboard.png)
+<img width="1915" height="837" alt="image" src="https://github.com/user-attachments/assets/e1e586ca-74f9-4647-a3f5-44e74ab3cf6b" />
+
 
 ### Bills
 <!-- Add screenshot: bills list with status badges (pending, overdue, paid) -->
-![Bills](docs/screenshots/bills.png)
+
 
 ### Bill Detail & Agent Actions
 <!-- Add screenshot: single bill view with AI-extracted details and action buttons -->
-![Bill Detail](docs/screenshots/bill-detail.png)
+<img width="1919" height="818" alt="image" src="https://github.com/user-attachments/assets/f412e479-c9bb-4bd4-9f3b-bd0205e3735c" />
+
 
 ### Spending Tracker
 <!-- Add screenshot: spending page with category breakdown and daily chart -->
-![Spending](docs/screenshots/spending.png)
+<img width="1919" height="819" alt="image" src="https://github.com/user-attachments/assets/d7dc3748-0940-4075-9611-2c89008ab515" />
+
 
 ### AI Insights
 <!-- Add screenshot: AI-generated spending insights panel -->
-![Insights](docs/screenshots/insights.png)
+<img width="1904" height="826" alt="image" src="https://github.com/user-attachments/assets/e80f9710-329f-42f3-b33b-61b8b08ed3fe" />
+
 
 ---
 
