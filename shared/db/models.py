@@ -79,6 +79,7 @@ class User(Base):
     raw_emails: Mapped[list["RawEmail"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     bills: Mapped[list["Bill"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     actions: Mapped[list["Action"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    transactions: Mapped[list["Transaction"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class OAuthToken(Base):
@@ -220,6 +221,65 @@ class Action(Base):
     __table_args__ = (
         Index("idx_actions_idempotency", "idempotency_key"),
         Index("idx_actions_bill", "bill_id"),
+    )
+
+
+# ─── Transactions ─────────────────────────────────────────────────────────────
+
+class TransactionType(str, enum.Enum):
+    DEBIT = "debit"
+    CREDIT = "credit"
+
+
+class TransactionCategory(str, enum.Enum):
+    FOOD = "food"
+    TRANSPORT = "transport"
+    SHOPPING = "shopping"
+    ENTERTAINMENT = "entertainment"
+    UTILITIES = "utilities"
+    HEALTHCARE = "healthcare"
+    EDUCATION = "education"
+    TRAVEL = "travel"
+    SUBSCRIPTIONS = "subscriptions"
+    OTHER = "other"
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    email_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Gmail message ID
+
+    # Core extracted fields
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    type: Mapped[TransactionType] = mapped_column(
+        SAEnum(TransactionType, name="transaction_type", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=TransactionType.DEBIT,
+    )
+    merchant: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category: Mapped[TransactionCategory] = mapped_column(
+        SAEnum(TransactionCategory, name="transaction_category", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=TransactionCategory.OTHER,
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # bank/app name
+
+    raw_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    extraction_confidence: Mapped[float] = mapped_column(Numeric(4, 3), default=0.0)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="transactions")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "email_id", name="uq_transaction_user_email"),
+        Index("idx_transactions_user_date", "user_id", "date"),
+        Index("idx_transactions_user_category", "user_id", "category"),
     )
 
 

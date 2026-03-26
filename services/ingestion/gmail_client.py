@@ -27,6 +27,19 @@ log = structlog.get_logger()
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
+TRANSACTION_KEYWORDS = [
+    "debited", "credited", "upi", "transaction", "payment", "spent",
+    "transferred", "withdrawn", "deposited", "refund", "cashback",
+    "bank alert", "account alert", "neft", "imps", "rtgs",
+    "डेबिट", "क्रेडिट",
+]
+
+TRANSACTION_SENDERS = [
+    "axisbank", "hdfcbank", "icicibank", "sbi", "kotakbank", "yesbank",
+    "paytm", "phonepe", "gpay", "googlepay", "amazonpay",
+    "alerts", "notify",
+]
+
 BILL_KEYWORDS = [
     "bill", "invoice", "payment due", "amount due", "pay now", "statement",
     "receipt", "subscription renewal", "outstanding balance", "overdue",
@@ -68,6 +81,13 @@ def bleach_clean(text: str) -> str:
 def _is_bill_email(subject: str, snippet: str) -> bool:
     combined = (subject + " " + snippet).lower()
     return any(kw in combined for kw in BILL_KEYWORDS)
+
+
+def _is_transaction_email(subject: str, snippet: str, sender: str) -> bool:
+    combined = (subject + " " + snippet).lower()
+    keyword_match = any(kw in combined for kw in TRANSACTION_KEYWORDS)
+    sender_match = any(s in sender.lower() for s in TRANSACTION_SENDERS)
+    return keyword_match or sender_match
 
 
 def _decode_part(part: dict) -> str:
@@ -179,6 +199,52 @@ class GmailClient:
                 continue
 
         log.info("Bill emails found", count=len(parsed))
+        return parsed
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=2, max=30),
+        retry=retry_if_exception_type(HttpError),
+    )
+    def fetch_transaction_emails(
+        self,
+        max_results: int = 100,
+        days_back: int = 30,
+    ) -> list[ParsedEmail]:
+        """
+        Fetch bank / UPI / payment alert emails.
+        Uses targeted Gmail search and transaction keyword pre-filter.
+        """
+        service = self._get_service()
+        query = (
+            "(subject:(debited OR credited OR \"UPI\" OR \"transaction\" OR \"payment\" OR \"alert\") "
+            "OR from:(alerts OR notify OR axisbank OR hdfcbank OR icicibank OR sbi OR paytm OR phonepe OR gpay))"
+            f" newer_than:{days_back}d"
+        )
+
+        log.info("Fetching transaction emails", query=query, max_results=max_results)
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_results)
+            .execute()
+        )
+
+        messages_meta = result.get("messages", [])
+        log.info("Transaction email candidates", count=len(messages_meta))
+
+        parsed: list[ParsedEmail] = []
+        for meta in messages_meta:
+            try:
+                email = self._fetch_and_parse(service, meta["id"])
+                if email and _is_transaction_email(email.subject, email.snippet, email.sender):
+                    parsed.append(email)
+                    log.debug("Transaction candidate", subject=email.subject, sender=email.sender)
+            except HttpError as e:
+                log.error("Failed to fetch transaction message", message_id=meta["id"], error=str(e))
+                continue
+
+        log.info("Transaction emails after filter", count=len(parsed))
         return parsed
 
     @retry(

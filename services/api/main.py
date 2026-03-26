@@ -12,7 +12,7 @@ from shared.telemetry.setup import setup_telemetry
 from shared.db.session import init_db
 
 from services.api.middleware.rls_middleware import RLSContextMiddleware
-from services.api.routers import health, auth, bills, ingestion
+from services.api.routers import health, auth, bills, ingestion, transactions
 
 log = structlog.get_logger()
 
@@ -57,5 +57,7 @@ API_PREFIX = "/api/v1"
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(auth.legacy_router, prefix="/api")
 app.include_router(bills.router, prefix=API_PREFIX)
 app.include_router(ingestion.router, prefix=API_PREFIX)
+app.include_router(transactions.router, prefix=API_PREFIX)

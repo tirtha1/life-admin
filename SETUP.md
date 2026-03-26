@@ -70,11 +70,11 @@ npm run dev
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Create a project → Enable Gmail API
-3. Create OAuth2 credentials (Desktop application type)
-4. Set the redirect URI to `http://localhost:8000/api/ingestion/oauth/callback`
+3. Create OAuth2 credentials (Web application type)
+4. Set the redirect URI to `http://localhost:8000/api/v1/auth/callback`
 5. Add your email to test users (OAuth consent screen)
-6. Visit `http://localhost:8000/api/ingestion/oauth/start` to authorize
-7. Copy the `refresh_token` from the response into your `.env`
+6. Visit `http://localhost:8000/api/v1/auth/google` to start OAuth
+7. Use the returned `access_token` for local API calls, or keep using `scripts/gmail_setup.py` for the default dev user flow
 
 ### SMTP (Email Notifications)
 
@@ -89,23 +89,23 @@ For Gmail SMTP:
 
 ### Sync Gmail Bills
 ```
-POST /api/ingestion/sync
+POST /api/v1/ingestion/sync
 ```
-Scans your Gmail for bill-related emails → Claude extracts bill info → LangGraph agent decides action.
+Queues a background Gmail poll for the authenticated user.
 
 ### Run Agent on All Pending Bills
 ```
-POST /api/bills/run-all-pending
+POST /api/v1/bills/run-all-pending
 ```
 
 ### Manually Add a Bill
 ```
-POST /api/ingestion/manual?provider=Airtel&amount=999&due_date=2024-12-01&bill_type=phone
+POST /api/v1/ingestion/manual?provider=Airtel&amount=999&due_date=2024-12-01&bill_type=phone
 ```
 
 ### Mark a Bill as Paid
 ```
-POST /api/bills/{id}/mark-paid
+POST /api/v1/bills/{id}/mark-paid
 ```
 
 ---

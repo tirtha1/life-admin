@@ -224,6 +224,115 @@ async def fetch_bill_emails(
         return []
 
 
+# Keywords that indicate a UPI / bank transaction alert email
+TRANSACTION_KEYWORDS = [
+    "debited", "credited", "upi", "transaction", "payment",
+    "spent", "transferred", "withdrawn", "deposited", "refund",
+    "cashback", "bank alert", "account alert", "neft", "imps", "rtgs",
+    "डेबिट", "क्रेडिट",  # Hindi
+]
+
+_TRANSACTION_SENDERS = [
+    "axisbank", "hdfcbank", "icicibank", "sbi", "kotakbank", "yesbank",
+    "paytm", "phonepe", "gpay", "googlepay", "amazonpay",
+    "alerts", "notify", "noreply", "no-reply",
+]
+
+
+def _is_transaction_email(subject: str, sender: str, body_preview: str) -> bool:
+    """Quick heuristic to detect bank/UPI transaction alert emails."""
+    text = (subject + " " + body_preview).lower()
+    sender_lower = sender.lower()
+    keyword_match = any(kw in text for kw in TRANSACTION_KEYWORDS)
+    sender_match = any(s in sender_lower for s in _TRANSACTION_SENDERS)
+    return keyword_match or sender_match
+
+
+async def fetch_transaction_emails(
+    max_results: int = 100,
+    days_back: int = 30,
+) -> list[EmailMessage]:
+    """
+    Fetch transaction alert emails from Gmail (bank debits, UPI payments, etc.)
+
+    Uses a targeted Gmail search query to find bank/payment alerts.
+    Returns EmailMessage objects for all candidates.
+    """
+    try:
+        service = _build_gmail_service()
+    except ValueError as e:
+        log.warning("Gmail not configured for transaction fetch", error=str(e))
+        return []
+
+    query = (
+        f"(subject:(debited OR credited OR \"UPI\" OR \"transaction\" OR \"payment\") "
+        f"OR from:(alerts OR notify OR noreply OR axisbank OR hdfcbank OR icicibank "
+        f"OR sbi OR paytm OR phonepe OR gpay)) "
+        f"newer_than:{days_back}d"
+    )
+
+    try:
+        log.info("Fetching transaction emails", query=query, max_results=max_results)
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_results)
+            .execute()
+        )
+
+        messages_meta = result.get("messages", [])
+        log.info("Transaction email candidates", count=len(messages_meta))
+
+        transaction_emails: list[EmailMessage] = []
+
+        for meta in messages_meta:
+            try:
+                msg = (
+                    service.users()
+                    .messages()
+                    .get(userId="me", id=meta["id"], format="full")
+                    .execute()
+                )
+
+                headers = {
+                    h["name"].lower(): h["value"]
+                    for h in msg.get("payload", {}).get("headers", [])
+                }
+
+                subject = headers.get("subject", "(no subject)")
+                sender_raw = headers.get("from", "")
+                _, sender_email = parseaddr(sender_raw)
+                snippet = msg.get("snippet", "")
+                sender = sender_email or sender_raw
+
+                if not _is_transaction_email(subject, sender, snippet):
+                    continue
+
+                body = _extract_body(msg.get("payload", {}))
+
+                transaction_emails.append(
+                    EmailMessage(
+                        message_id=meta["id"],
+                        subject=subject,
+                        sender=sender,
+                        body=body,
+                        snippet=snippet,
+                    )
+                )
+                log.debug("Transaction candidate found", subject=subject, sender=sender)
+
+            except HttpError as e:
+                log.error("Failed to fetch transaction email", message_id=meta["id"], error=str(e))
+                continue
+
+        log.info("Transaction email candidates after filter", count=len(transaction_emails))
+        return transaction_emails
+
+    except HttpError as e:
+        log.error("Gmail API error (transactions)", error=str(e))
+        return []
+
+
 def get_oauth_url() -> str:
     """Generate Gmail OAuth2 authorization URL."""
     from google_auth_oauthlib.flow import Flow

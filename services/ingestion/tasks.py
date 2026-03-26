@@ -6,6 +6,7 @@ import asyncio
 import os
 import structlog
 from datetime import datetime, timezone
+from typing import Optional
 
 import redis as sync_redis
 from celery import Celery

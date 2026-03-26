@@ -140,30 +140,6 @@ async def mark_paid(bill_id: int, db: AsyncSession = Depends(get_db)):
     return bill
 
 
-@router.post("/{bill_id}/run-agent", response_model=AgentRunResult)
-async def run_agent_for_bill(bill_id: int, db: AsyncSession = Depends(get_db)):
-    """
-    Manually trigger the LangGraph agent for a specific bill.
-    Useful for re-processing or testing.
-    """
-    result = await db.execute(select(Bill).where(Bill.id == bill_id))
-    bill = result.scalar_one_or_none()
-    if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
-
-    try:
-        final_state = await run_bill_agent(bill)
-        return AgentRunResult(
-            bill_id=bill_id,
-            action=AgentAction(final_state["action"]),
-            notes=" | ".join(final_state["execution_notes"]),
-            notification_sent=final_state["notification_sent"],
-        )
-    except Exception as e:
-        log.error("Agent run failed", bill_id=bill_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
-
-
 @router.post("/run-all-pending", response_model=list[AgentRunResult])
 async def run_agent_for_all_pending(
     background_tasks: BackgroundTasks,
@@ -204,3 +180,27 @@ async def run_agent_for_all_pending(
             )
 
     return results
+
+
+@router.post("/{bill_id}/run-agent", response_model=AgentRunResult)
+async def run_agent_for_bill(bill_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Manually trigger the LangGraph agent for a specific bill.
+    Useful for re-processing or testing.
+    """
+    result = await db.execute(select(Bill).where(Bill.id == bill_id))
+    bill = result.scalar_one_or_none()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    try:
+        final_state = await run_bill_agent(bill)
+        return AgentRunResult(
+            bill_id=bill_id,
+            action=AgentAction(final_state["action"]),
+            notes=" | ".join(final_state["execution_notes"]),
+            notification_sent=final_state["notification_sent"],
+        )
+    except Exception as e:
+        log.error("Agent run failed", bill_id=bill_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")

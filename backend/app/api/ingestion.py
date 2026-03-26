@@ -19,6 +19,12 @@ from app.services.bill_extractor import (
     normalize_bill_type,
 )
 from app.services.agent.bill_agent import run_bill_agent
+from app.models.transaction import Transaction, TransactionType, TransactionCategory
+from app.schemas.transaction import TransactionSyncResult
+from app.services.transaction_extractor import (
+    extract_transaction_from_email,
+    parse_transaction_date,
+)
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -173,6 +179,103 @@ async def sync_gmail_background(
 class ManualBillInput:
     """For direct bill submission via API (no email)."""
     pass
+
+
+# ─── Transaction Sync (UPI / bank alerts) ─────────────────────────────────────
+
+async def _process_transaction_emails(db: AsyncSession) -> TransactionSyncResult:
+    """
+    Full pipeline: Gmail transaction alerts → Claude extraction → DB.
+    """
+    emails = await gmail_service.fetch_transaction_emails(max_results=100, days_back=30)
+
+    result = TransactionSyncResult(
+        emails_scanned=len(emails),
+        transactions_found=0,
+        transactions_new=0,
+        transactions_skipped=0,
+        errors=0,
+    )
+
+    for email in emails:
+        try:
+            # Deduplication
+            existing = await db.execute(
+                select(Transaction).where(Transaction.email_id == email.message_id)
+            )
+            if existing.scalar_one_or_none():
+                result.transactions_skipped += 1
+                continue
+
+            extraction = await extract_transaction_from_email(email.text_for_extraction())
+
+            if not extraction.is_transaction or extraction.amount is None:
+                log.debug("Email not a transaction, skipping", subject=email.subject)
+                continue
+
+            result.transactions_found += 1
+
+            # Normalise type
+            try:
+                txn_type = TransactionType(extraction.type or "debit")
+            except ValueError:
+                txn_type = TransactionType.DEBIT
+
+            # Normalise category
+            try:
+                category = TransactionCategory(extraction.category or "other")
+            except ValueError:
+                category = TransactionCategory.OTHER
+
+            txn = Transaction(
+                email_id=email.message_id,
+                amount=extraction.amount,
+                type=txn_type,
+                merchant=extraction.merchant,
+                category=category,
+                date=parse_transaction_date(extraction.date),
+                source=extraction.source,
+                raw_text=email.text_for_extraction()[:2000],
+                extraction_confidence=extraction.confidence,
+            )
+            db.add(txn)
+            result.transactions_new += 1
+            log.info(
+                "Transaction created",
+                amount=txn.amount,
+                merchant=txn.merchant,
+                category=txn.category,
+                date=txn.date,
+            )
+
+        except Exception as e:
+            log.error("Error processing transaction email", subject=email.subject, error=str(e))
+            result.errors += 1
+            continue
+
+    await db.commit()
+    return result
+
+
+@router.post("/transactions/sync", response_model=TransactionSyncResult)
+async def sync_transactions(db: AsyncSession = Depends(get_db)):
+    """
+    Sync Gmail for UPI / bank transaction alert emails.
+    Extracts structured transactions and stores them in the DB.
+    """
+    log.info("Starting transaction sync")
+    try:
+        result = await _process_transaction_emails(db)
+        log.info(
+            "Transaction sync complete",
+            scanned=result.emails_scanned,
+            found=result.transactions_found,
+            new=result.transactions_new,
+        )
+        return result
+    except Exception as e:
+        log.error("Transaction sync failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/manual", response_model=dict)

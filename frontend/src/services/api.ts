@@ -1,5 +1,8 @@
 import axios from "axios";
-import type { Bill, BillStats, SyncResult, AgentRunResult } from "@/types";
+import type {
+  Bill, BillStats, SyncResult, AgentRunResult,
+  Transaction, SpendStats, InsightsResponse, TransactionSyncResult,
+} from "@/types";
 
 const DEV_TOKEN = import.meta.env.VITE_DEV_TOKEN || "";
 
@@ -54,6 +57,24 @@ export const ingestionApi = {
     bill_type?: string;
     currency?: string;
   }) => api.post("/api/v1/ingestion/manual", null, { params: data }).then((r) => r.data),
+};
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+export const transactionsApi = {
+  list: (params?: { type?: string; category?: string; date_from?: string; date_to?: string; limit?: number }) =>
+    api.get<Transaction[]>("/api/v1/transactions", { params }).then((r) => r.data),
+
+  stats: (days = 30) =>
+    api.get<SpendStats>("/api/v1/transactions/stats", { params: { days } }).then((r) => r.data),
+
+  insights: (days = 30) =>
+    api.get<InsightsResponse>("/api/v1/transactions/insights", { params: { days } }).then((r) => r.data),
+
+  sync: () =>
+    api.post<TransactionSyncResult>("/api/v1/ingestion/transactions/sync").then((r) => r.data),
+
+  delete: (id: number) => api.delete(`/api/v1/transactions/${id}`),
 };
 
 // ─── Health ───────────────────────────────────────────────────────────────────

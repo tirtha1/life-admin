@@ -52,13 +52,76 @@ export interface BillStats {
 }
 
 export interface SyncResult {
-  new: number;
-  skipped: number;
-  failed: number;
+  message: string;
+  user_id: string;
 }
 
 export interface AgentRunResult {
   bill_id: string;
   action: AgentAction;
   notes: string;
+}
+
+// ─── Transactions ────────────────────────────────────────────────────────────
+
+export type TransactionType = "debit" | "credit";
+
+export type TransactionCategory =
+  | "food"
+  | "transport"
+  | "shopping"
+  | "entertainment"
+  | "utilities"
+  | "healthcare"
+  | "education"
+  | "travel"
+  | "subscriptions"
+  | "other";
+
+export interface Transaction {
+  id: number;
+  email_id?: string | null;
+  amount: number;
+  type: TransactionType;
+  merchant?: string | null;
+  category: TransactionCategory;
+  date: string;
+  source?: string | null;
+  extraction_confidence: number;
+}
+
+export interface DailySpend {
+  date: string;
+  total: number;
+  count: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  total: number;
+  count: number;
+  percentage: number;
+}
+
+export interface SpendStats {
+  total_this_month: number;
+  total_today: number;
+  total_this_week: number;
+  transaction_count: number;
+  daily_spend: DailySpend[];
+  category_breakdown: CategoryBreakdown[];
+  top_merchant?: string | null;
+}
+
+export interface InsightsResponse {
+  insights: string[];
+  generated_at: string;
+}
+
+export interface TransactionSyncResult {
+  emails_scanned: number;
+  transactions_found: number;
+  transactions_new: number;
+  transactions_skipped: number;
+  errors: number;
 }

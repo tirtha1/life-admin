@@ -157,4 +157,4 @@ async def _update_bill_and_queue(state: AgentState) -> dict:
 
 def queue_action(state: AgentState) -> dict:
     """Publish action to Kafka and update bill status in DB."""
-    return asyncio.get_event_loop().run_until_complete(_update_bill_and_queue(state))
+    return asyncio.run(_update_bill_and_queue(state))

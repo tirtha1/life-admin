@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Receipt,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import { billsApi, ingestionApi } from "@/services/api";
 import BillCard from "@/components/BillCard";
-import type { BillStats, SyncResult } from "@/types";
+import type { SyncResult } from "@/types";
 
 function StatCard({
   label,
@@ -44,26 +45,37 @@ function StatCard({
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const [syncPollUntil, setSyncPollUntil] = useState<number | null>(null);
+
+  const getSyncRefetchInterval = () => {
+    if (syncPollUntil && Date.now() < syncPollUntil) {
+      return 5_000;
+    }
+    return false;
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["bills", "stats"],
     queryFn: billsApi.stats,
-    refetchInterval: 30_000,
+    refetchInterval: () => getSyncRefetchInterval() || 30_000,
   });
 
   const { data: urgentBills } = useQuery({
     queryKey: ["bills", "extracted"],
     queryFn: () => billsApi.list({ status: "extracted", limit: 5 }),
+    refetchInterval: getSyncRefetchInterval,
   });
 
   const { data: reviewBills } = useQuery({
     queryKey: ["bills", "review_required"],
     queryFn: () => billsApi.list({ status: "review_required", limit: 5 }),
+    refetchInterval: getSyncRefetchInterval,
   });
 
   const syncMutation = useMutation({
     mutationFn: ingestionApi.sync,
-    onSuccess: (result: SyncResult) => {
+    onSuccess: (_result: SyncResult) => {
+      setSyncPollUntil(Date.now() + 60_000);
       queryClient.invalidateQueries({ queryKey: ["bills"] });
     },
   });
@@ -76,11 +88,10 @@ export default function Dashboard() {
   });
 
   const formatCurrency = (amount: number) =>
-    `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+    `INR ${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
   return (
     <div className="space-y-8">
-      {/* Title row */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -116,16 +127,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Sync result banner */}
       {syncMutation.data && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
-          ✅ Sync complete — added <strong>{syncMutation.data.new}</strong> new,
-          skipped <strong>{syncMutation.data.skipped}</strong>,
-          failed <strong>{syncMutation.data.failed}</strong>.
+          {syncMutation.data.message}. New bills will appear after the ingestion
+          worker finishes processing.
         </div>
       )}
 
-      {/* Stats grid */}
       {statsLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -165,7 +173,6 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      {/* Extracted bills */}
       {urgentBills && urgentBills.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-blue-700 mb-3 flex items-center gap-2">
@@ -180,7 +187,6 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Needs review bills */}
       {reviewBills && reviewBills.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-orange-700 mb-3 flex items-center gap-2">
@@ -199,7 +205,9 @@ export default function Dashboard() {
         <div className="text-center py-16 text-gray-400">
           <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-300" />
           <p className="text-lg font-medium text-gray-600">All clear!</p>
-          <p className="text-sm">No pending or overdue bills. Sync Gmail to check for new ones.</p>
+          <p className="text-sm">
+            No pending or overdue bills. Sync Gmail to check for new ones.
+          </p>
         </div>
       )}
     </div>

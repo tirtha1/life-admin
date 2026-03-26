@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Receipt, Brain } from "lucide-react";
+import { LayoutDashboard, Receipt, Brain, TrendingUp } from "lucide-react";
 import clsx from "clsx";
 
 export default function Header() {
@@ -16,6 +16,7 @@ export default function Header() {
           {[
             { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
             { to: "/bills", icon: Receipt, label: "Bills" },
+            { to: "/transactions", icon: TrendingUp, label: "Spending" },
           ].map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
