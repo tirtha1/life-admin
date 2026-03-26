@@ -1,0 +1,4 @@
+FROM lifeadmin-base:latest
+
+# Celery Beat scheduler for periodic inbox polling
+CMD ["python", "-m", "services.ingestion.main", "beat"]

@@ -1,0 +1,3 @@
+FROM lifeadmin-base:latest
+
+CMD ["python", "-c", "from services.processor.consumer import run; run()"]

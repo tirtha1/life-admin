@@ -1,0 +1,4 @@
+FROM lifeadmin-base:latest
+
+# Celery worker for ingestion
+CMD ["python", "-m", "services.ingestion.main", "worker"]

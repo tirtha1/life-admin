@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bill Payment Reminder</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f5; margin: 0; padding: 20px; }
+    .card { background: #fff; border-radius: 12px; max-width: 520px; margin: 0 auto; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .header { border-bottom: 2px solid #f4f4f5; padding-bottom: 20px; margin-bottom: 24px; }
+    .logo { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+    .logo span { color: #6366f1; }
+    h1 { font-size: 20px; color: #1a1a2e; margin: 0 0 4px; }
+    .subtitle { color: #6b7280; font-size: 14px; }
+    .bill-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 24px 0; }
+    .bill-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; }
+    .bill-row .label { color: #6b7280; }
+    .bill-row .value { font-weight: 600; color: #1a1a2e; }
+    .amount { font-size: 28px; font-weight: 700; color: #1a1a2e; text-align: center; padding: 12px 0; }
+    .due-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .due-critical { background: #fee2e2; color: #dc2626; }
+    .due-high { background: #fef3c7; color: #d97706; }
+    .due-normal { background: #dbeafe; color: #2563eb; }
+    .cta { text-align: center; margin: 28px 0 16px; }
+    .btn { display: inline-block; background: #6366f1; color: #fff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; }
+    .optimize-tip { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin-top: 20px; font-size: 14px; color: #92400e; }
+    .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 32px; padding-top: 20px; border-top: 1px solid #f4f4f5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logo">Life<span>Admin</span></div>
+    </div>
+
+    <h1>Payment Reminder</h1>
+    <p class="subtitle">Hi {{ user_name or 'there' }}, you have a bill due soon.</p>
+
+    <div class="bill-box">
+      <div class="bill-row">
+        <span class="label">Provider</span>
+        <span class="value">{{ provider }}</span>
+      </div>
+      <div class="bill-row">
+        <span class="label">Bill Type</span>
+        <span class="value">{{ bill_type | title }}</span>
+      </div>
+      {% if account_number %}
+      <div class="bill-row">
+        <span class="label">Account</span>
+        <span class="value">{{ account_number }}</span>
+      </div>
+      {% endif %}
+      <div class="bill-row">
+        <span class="label">Due Date</span>
+        <span class="value">
+          {{ due_date }}
+          {% if due_in_days is not none %}
+            {% if due_in_days < 0 %}
+              <span class="due-badge due-critical">{{ -due_in_days }}d overdue</span>
+            {% elif due_in_days <= 1 %}
+              <span class="due-badge due-critical">Due today!</span>
+            {% elif due_in_days <= 3 %}
+              <span class="due-badge due-high">In {{ due_in_days }} days</span>
+            {% else %}
+              <span class="due-badge due-normal">In {{ due_in_days }} days</span>
+            {% endif %}
+          {% endif %}
+        </span>
+      </div>
+      {% if amount %}
+      <div class="amount">{{ currency }} {{ "{:,.2f}".format(amount) }}</div>
+      {% endif %}
+    </div>
+
+    {% if optimize_tip %}
+    <div class="optimize-tip">
+      💡 <strong>Savings tip:</strong> {{ optimize_tip }}
+    </div>
+    {% endif %}
+
+    <div class="cta">
+      <a href="{{ app_url }}" class="btn">View Bill Details</a>
+    </div>
+
+    <div class="footer">
+      <p>This reminder was sent by LifeAdmin. <a href="{{ unsubscribe_url }}">Unsubscribe</a></p>
+      <p>© 2025 LifeAdmin. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
