@@ -87,9 +87,27 @@ async def get_current_user(
     return CurrentUser(user_id=user_id, email=email, payload=payload)
 
 
+def create_app_token(user_id: str, email: str, expires_days: int = 30) -> str:
+    """
+    Create a signed JWT for authenticated users (Google OAuth flow).
+    Uses HS256 in dev (no RSA private key configured) or RS256 in prod.
+    Includes exp claim so tokens expire.
+    """
+    import jwt as _jwt
+    from datetime import timedelta
+
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(days=expires_days),
+    }
+    return _jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_DEV_ALGORITHM)
+
+
 def create_dev_token(user_id: str, email: str) -> str:
     """
-    Create a dev HS256 token for local testing.
+    Create a dev HS256 token for local testing (no expiry).
     NOT for production use.
     """
     import jwt as _jwt

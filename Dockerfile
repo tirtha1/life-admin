@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir \
     boto3 \
     google-auth google-auth-oauthlib google-api-python-client \
     html2text bleach \
+    pandas pdfplumber "python-dateutil>=2.9" "pydantic-settings>=2.6" python-multipart \
     tenacity "structlog>=24.4" \
     sendgrid twilio \
     jinja2 \

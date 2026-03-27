@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import create_tables
 from app.core.config import get_settings
-from app.api import bills, ingestion, health, transactions
+from app.api import bills, ingestion, health, statement_analysis, transactions
 # Import models so SQLAlchemy metadata includes them for create_all
 from app.models import bill, transaction  # noqa: F401
 
@@ -40,6 +40,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(bills.router, prefix="/api/v1/bills", tags=["bills"])
 app.include_router(ingestion.router, prefix="/api/v1/ingestion", tags=["ingestion"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(statement_analysis.router, prefix="/api/v1/statements", tags=["statements"])
 
 
 @app.get("/")

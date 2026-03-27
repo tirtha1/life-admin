@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ─── Life Admin Production Stack (Local Dev) ──────────────────────────────────
 # Ports summary:
 #   5432  PostgreSQL

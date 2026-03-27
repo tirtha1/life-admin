@@ -17,7 +17,7 @@ from shared.db.models import RawEmail, User
 from shared.telemetry.setup import setup_telemetry
 from shared.vault.client import VaultClient
 
-from services.ingestion.gmail_client import GmailClient, ParsedEmail
+from services.ingestion.gmail_client import GmailClient, ParsedEmail, describe_gmail_exception
 from services.ingestion.token_manager import TokenManager
 from services.ingestion.deduplicator import is_duplicate, mark_processed
 from services.ingestion.s3_uploader import upload_email, ensure_bucket_exists
@@ -173,8 +173,9 @@ async def _process_user_inbox(user_id: str) -> dict:
     try:
         emails = gmail.fetch_recent_emails(max_results=50, days_back=30)
     except Exception as exc:
-        log.error("Gmail fetch failed", user_id=user_id, error=str(exc))
-        raise GmailAPIError(str(exc)) from exc
+        error_message = describe_gmail_exception(exc)
+        log.error("Gmail fetch failed", user_id=user_id, error=error_message)
+        raise GmailAPIError(error_message) from exc
 
     log.info("Fetched bill candidates", user_id=user_id, count=len(emails))
 

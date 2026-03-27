@@ -147,7 +147,16 @@ async def extract_transaction(email_text: str) -> TransactionExtraction:
             messages=[{"role": "user", "content": f"Parse this email:\n\n{text}"}],
             output_format=TransactionExtraction,
         )
-        result: TransactionExtraction = response.parsed
+        parsed = getattr(response, "parsed_output", None)
+        if parsed is None:
+            parsed = getattr(response, "parsed", None)
+        if parsed is None:
+            raise ValueError("Claude parse response did not include parsed output")
+        result = (
+            parsed
+            if isinstance(parsed, TransactionExtraction)
+            else TransactionExtraction.model_validate(parsed)
+        )
         log.debug(
             "transaction extracted",
             is_txn=result.is_transaction,

@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   Bill, BillStats, SyncResult, AgentRunResult,
   Transaction, SpendStats, InsightsResponse, TransactionSyncResult,
+  StatementAnalysisResponse,
 } from "@/types";
 
 const DEV_TOKEN = import.meta.env.VITE_DEV_TOKEN || "";
@@ -78,6 +79,18 @@ export const transactionsApi = {
 };
 
 // ─── Health ───────────────────────────────────────────────────────────────────
+
+export const statementsApi = {
+  analyze: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post<StatementAnalysisResponse>("/api/v1/statements/analyze", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+};
 
 export const healthApi = {
   check: () => api.get("/health").then((r) => r.data),

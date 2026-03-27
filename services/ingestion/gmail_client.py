@@ -3,10 +3,7 @@ Gmail API client with OAuth2 refresh, incremental polling via historyId,
 exponential backoff, and keyword pre-filter.
 """
 import base64
-import os
-import time
 import structlog
-from email import message_from_bytes
 from email.utils import parseaddr
 from dataclasses import dataclass
 from typing import Optional
@@ -17,10 +14,11 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from tenacity import (
+    RetryError,
     retry,
     stop_after_attempt,
     wait_exponential_jitter,
-    retry_if_exception_type,
+    retry_if_exception,
 )
 
 log = structlog.get_logger()
@@ -125,6 +123,59 @@ def _extract_body(payload: dict) -> str:
     return ""
 
 
+def _is_retryable_http_error(exc: Exception) -> bool:
+    if not isinstance(exc, HttpError):
+        return False
+    status = getattr(exc.resp, "status", None)
+    return status in {408, 429, 500, 502, 503, 504}
+
+
+def describe_gmail_exception(exc: Exception) -> str:
+    if isinstance(exc, RetryError):
+        last_exc = exc.last_attempt.exception()
+        if last_exc is not None:
+            return describe_gmail_exception(last_exc)
+        return "Gmail request failed after retries."
+
+    if isinstance(exc, HttpError):
+        status = getattr(exc.resp, "status", "unknown")
+        details = str(exc)
+        error_details = getattr(exc, "error_details", None)
+        if isinstance(error_details, list) and error_details:
+            first_detail = error_details[0]
+            if isinstance(first_detail, dict):
+                details = first_detail.get("message") or first_detail.get("reason") or details
+        return f"Gmail API error ({status}): {details}"
+
+    return str(exc)
+
+
+def _build_transaction_query(days_back: int) -> str:
+    # Gmail search accepts braces as OR groups and handles this more reliably than nested parentheses.
+    terms = [
+        "subject:debited",
+        "subject:credited",
+        'subject:"UPI"',
+        "subject:transaction",
+        "subject:payment",
+        "subject:alert",
+        "from:alerts",
+        "from:notify",
+        "from:axisbank",
+        "from:hdfcbank",
+        "from:icicibank",
+        "from:sbi",
+        "from:kotakbank",
+        "from:yesbank",
+        "from:paytm",
+        "from:phonepe",
+        "from:gpay",
+        "from:googlepay",
+        "from:amazonpay",
+    ]
+    return f"newer_than:{days_back}d " + "{" + " ".join(terms) + "}"
+
+
 class GmailClient:
     """
     Gmail API wrapper.
@@ -161,7 +212,7 @@ class GmailClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential_jitter(initial=2, max=30),
-        retry=retry_if_exception_type(HttpError),
+        retry=retry_if_exception(_is_retryable_http_error),
     )
     def fetch_recent_emails(
         self,
@@ -204,7 +255,7 @@ class GmailClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential_jitter(initial=2, max=30),
-        retry=retry_if_exception_type(HttpError),
+        retry=retry_if_exception(_is_retryable_http_error),
     )
     def fetch_transaction_emails(
         self,
@@ -216,11 +267,7 @@ class GmailClient:
         Uses targeted Gmail search and transaction keyword pre-filter.
         """
         service = self._get_service()
-        query = (
-            "(subject:(debited OR credited OR \"UPI\" OR \"transaction\" OR \"payment\" OR \"alert\") "
-            "OR from:(alerts OR notify OR axisbank OR hdfcbank OR icicibank OR sbi OR paytm OR phonepe OR gpay))"
-            f" newer_than:{days_back}d"
-        )
+        query = _build_transaction_query(days_back)
 
         log.info("Fetching transaction emails", query=query, max_results=max_results)
         result = (
@@ -250,7 +297,7 @@ class GmailClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential_jitter(initial=1, max=10),
-        retry=retry_if_exception_type(HttpError),
+        retry=retry_if_exception(_is_retryable_http_error),
     )
     def _fetch_and_parse(self, service, message_id: str) -> Optional[ParsedEmail]:
         msg = (

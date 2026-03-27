@@ -8,6 +8,7 @@ from datetime import date
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, text
+from tenacity import RetryError
 
 from shared.db.models import Transaction, TransactionType, TransactionCategory
 from shared.db.session import get_db_session
@@ -17,6 +18,7 @@ from services.api.transaction_extractor import (
     extract_transaction,
     parse_transaction_date,
 )
+from services.ingestion.gmail_client import describe_gmail_exception
 
 log = structlog.get_logger()
 
@@ -103,8 +105,10 @@ async def sync_transactions(
     try:
         emails = await asyncio.to_thread(gmail.fetch_transaction_emails, 100, 30)
     except Exception as exc:
-        log.error("Gmail transaction fetch failed", user_id=uid, error=str(exc))
-        raise HTTPException(status_code=503, detail=f"Gmail fetch failed: {exc}")
+        error_message = describe_gmail_exception(exc)
+        log.error("Gmail transaction fetch failed", user_id=uid, error=error_message)
+        status_code = 502 if isinstance(exc, RetryError) else 503
+        raise HTTPException(status_code=status_code, detail=f"Gmail fetch failed: {error_message}")
 
     result.emails_scanned = len(emails)
     log.info("Transaction emails fetched", user_id=uid, count=len(emails))

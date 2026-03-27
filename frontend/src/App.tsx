@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import Dashboard from "@/pages/Dashboard";
 import Bills from "@/pages/Bills";
 import BillDetail from "@/pages/BillDetail";
+import StatementAnalyzer from "@/pages/StatementAnalyzer";
 import Transactions from "@/pages/Transactions";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/bills" element={<Bills />} />
           <Route path="/bills/:id" element={<BillDetail />} />
+          <Route path="/statement-analyzer" element={<StatementAnalyzer />} />
           <Route path="/transactions" element={<Transactions />} />
         </Routes>
       </main>
